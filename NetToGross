@@ -1,0 +1,61 @@
+#!/usr/bin/env -S java --source 21
+
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+
+import static java.lang.Double.parseDouble;
+import static java.util.Collections.unmodifiableNavigableMap;
+import static java.util.Locale.ROOT;
+
+public class NetToGross {
+    private static final int MONTHS = 12;
+
+    private static final NavigableMap<Double, Double> THRESHOLD_TO_TAX = unmodifiableNavigableMap(new TreeMap<>(Map.of(
+                     0.0, 0.13,
+             2_400_000.0, 0.15,
+             5_000_000.0, 0.18,
+            20_000_000.0, 0.20,
+            50_000_000.0, 0.22
+    )));
+
+    static final NavigableMap<Double, Double> NET_TO_THRESHOLD = netToThreshold(THRESHOLD_TO_TAX);
+
+    public static void main(String[] args) {
+        final var desiredNet = parseDouble(args[0]) * MONTHS;
+
+        final var reachedNet = NET_TO_THRESHOLD.floorKey(desiredNet);
+        final var reachedGross = NET_TO_THRESHOLD.get(reachedNet);
+
+        final var remainingNet = desiredNet - reachedNet;
+        final var remainingTax = THRESHOLD_TO_TAX.get(reachedGross);
+        final var remainingGross = remainingNet / (1 - remainingTax);
+
+        final var desiredGross = (reachedGross + remainingGross) / MONTHS;
+        System.out.printf(ROOT, "%.2f", desiredGross);
+    }
+
+    private static NavigableMap<Double, Double> netToThreshold(
+            NavigableMap<Double, Double> thresholdToTax) {
+
+        final var thresholdToNet = new TreeMap<Double, Double>();
+
+        var net = 0.0;
+        var lastThreshold = thresholdToTax.firstKey();
+        var lastTax = thresholdToTax.get(lastThreshold);
+
+        for (final var thresholdToTaxEntry : thresholdToTax.entrySet()) {
+            final var currentThreshold = thresholdToTaxEntry.getKey();
+
+            final var grossDiff = currentThreshold - lastThreshold;
+            final var netRatio = 1 - lastTax;
+            final var netDiff = grossDiff * netRatio;
+            net += netDiff;
+            lastThreshold = currentThreshold;
+            lastTax = thresholdToTaxEntry.getValue();
+            thresholdToNet.put(net, lastThreshold);
+        }
+
+        return unmodifiableNavigableMap(thresholdToNet);
+    }
+}

@@ -1,0 +1,78 @@
+#!/usr/bin/env -S java --source 21
+
+import java.util.Map;
+import java.util.NavigableMap;
+import java.util.TreeMap;
+
+import static java.lang.Double.parseDouble;
+import static java.util.Collections.unmodifiableNavigableMap;
+import static java.util.Locale.ROOT;
+
+public class GrossToNetSchedule {
+    private static final int MONTHS = 12;
+
+    private static final NavigableMap<Double, Double> THRESHOLD_TO_TAX = unmodifiableNavigableMap(new TreeMap<>(Map.of(
+                     0.0, 0.13,
+             2_400_000.0, 0.15,
+             5_000_000.0, 0.18,
+            20_000_000.0, 0.20,
+            50_000_000.0, 0.22
+    )));
+
+    public static void main(String[] args) {
+        final var grossPerMonths = grossPerMonths(args);
+
+        var totalNet = 0.0;
+
+        var prevGross = 0.0;
+        var prevThreshold = THRESHOLD_TO_TAX.floorKey(prevGross);
+        var prevTax = THRESHOLD_TO_TAX.get(prevGross);
+
+        System.out.print("[");
+
+        for (var i = 0; i < MONTHS; ++i) {
+            final var currentGross = prevGross + grossPerMonths[i];
+            final var currentThreshold = THRESHOLD_TO_TAX.floorKey(currentGross);
+            final var currentTax = THRESHOLD_TO_TAX.get(currentThreshold);
+
+            var currentNet = 0.0;
+
+            final var passedThresholdToTax = THRESHOLD_TO_TAX.subMap(prevThreshold, false, currentThreshold, true);
+            for (final var passedThresholdAndTax : passedThresholdToTax.entrySet()) {
+                final var passedThreshold = passedThresholdAndTax.getKey();
+                final var passedTax = passedThresholdAndTax.getValue();
+
+                final var passedSegment = passedThreshold - prevGross;
+                currentNet += passedSegment * (1 - prevTax);
+                prevGross = passedThreshold;
+                prevTax = passedTax;
+            }
+
+            final var remainder = currentGross - prevGross;
+            currentNet += remainder * (1 - prevTax);
+            totalNet += currentNet;
+
+            prevGross = currentGross;
+            prevThreshold = currentThreshold;
+            prevTax = currentTax;
+
+            if (i > 0) {
+                System.out.print(", ");
+            }
+
+            System.out.printf(ROOT, "%.2f", currentNet);
+        }
+
+        System.out.printf(ROOT, "] -> %.2f", totalNet / MONTHS);
+    }
+
+    private static double[] grossPerMonths(String[] args) {
+        final var grossPerMonths = new double[MONTHS];
+
+        for (var i = 0; i < MONTHS; ++i) {
+            grossPerMonths[i] = (i < args.length) ? parseDouble(args[i]) : grossPerMonths[args.length - 1];
+        }
+
+        return grossPerMonths;
+    }
+}
