@@ -1,4 +1,4 @@
-#!/usr/bin/env -S java --source 21
+#!/usr/bin/env -S java --source 11
 
 import java.util.Map;
 import java.util.NavigableMap;
